@@ -948,19 +948,13 @@ function cleanKey(v){ return cleanText(v).replace(/\s+/g,""); }
 // === 線別白名單（依溫層分開；其餘移除） ===
 // 4°C 線別白名單
 const LINE_WHITELIST_4C = [
-  "四度一組 (ET-600)",
-  "四度二組A 熱麵 固定線 (ET-55)",
-  "四度二組 (ET-55)",
-  "四度二組 (烤飯糰/八爪機)",
-  "四度二組 (烤飯糰/十爪機)",
-  "四度三組 (ET-55)",
-  "四度四組 (ET-55)",
-  "四度五組 (ET-55)",
-  "綜合一組 (ET-55)",
-  "綜合二組 (ET-55)",
-  "綜合三組 (ET-55)",
-  "綜合四組",
-  "便當組 大口 固定線 (伺服包裝機)",
+  "自動一線 (ET-600)",
+  "自動二線 (ET-600)",
+  "手工三線 (ET-55)",
+  "手工四線 (ET-55)",
+  "手工五線 (ET-55)",
+  "調理包一線 (八爪機)",
+  "調理包二線 (手工)",
 ];
 
 function getLineWhitelistByTemp(_tempStr){
@@ -1969,7 +1963,7 @@ if(Number.isFinite(ab.cnt) || Number.isFinite(ab.val2) || Number.isFinite(sh.cnt
 (function(){
   const mmdd = (dateKey||"").slice(4); // YYYYMMDD -> MMDD
   const tempSheets = [
-    { temp: "4", shName: `長家4度C${mmdd}` },
+    { temp: "4", shName: `${mmdd}` },
   ];
 
   function findCellText(grid, pred, maxR=200, maxC=60){
@@ -2069,12 +2063,13 @@ if(Number.isFinite(ab.cnt) || Number.isFinite(ab.val2) || Number.isFinite(sh.cnt
   }
 
   parseSection("➁4度C-各編組展開", "4", "");
+  parseSection("4度C-各編組展開", "4", "");
 }
 
 
 function yearFromFilename(filename){
   const s = String(filename || "");
-  const m = s.match(/^(\d{3})\./);
+  const m = s.match(/^(\d{3})(?=\D)/);
   if(m){
     const roc = Number(m[1]);
     if(roc >= 1 && roc <= 999) return roc + 1911;
@@ -2096,13 +2091,22 @@ async function parseWorkbookArrayBuffer(buf, filename){
   const fileYear = yearFromFilename(filename);
 
   for(const sname of wb.SheetNames){
-    const mmdd = parseMmdd(sname);
-    if(mmdd){
-      const dateKey = `${fileYear}${mmdd}`;
+    const totalMatch = String(sname).match(/^\s*(\d{4})\s*總\s*$/);
+    if(totalMatch){
+      const dateKey = `${fileYear}${totalMatch[1]}`;
       parseDailySummarySheet(wb, sname, dateKey);
       continue;
     }
-    const t4  = String(sname).match(/(?:長家|長家)?\s*4度C\s*(\d{4})/);
+
+    const mmdd = parseMmdd(sname);
+    if(mmdd){
+      // 長家廠的明細分頁名稱為 0501、0502...；等同 4°C 日報明細。
+      parseTempSheet(wb, sname, "4",  `${fileYear}${mmdd}`);
+      continue;
+    }
+
+    // 相容舊式/其他匯出格式：若分頁名含「長家4度C0501」也能解析。
+    const t4  = String(sname).match(/(?:長家)?\s*4度C\s*(\d{4})/);
     if(t4)  parseTempSheet(wb, sname, "4",  `${fileYear}${t4[1]}`);
     }
 }
