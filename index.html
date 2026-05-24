@@ -842,6 +842,8 @@ function detectGitHubContext(){
 ========================= */
 async function listXlsxFilesFromManifest(){
   const tries = [
+    // 長家 repo 可能把 manifest.json 放在根目錄，也可能放在 data/ 內；兩者都嘗試。
+    { url: "./manifest.json", baseDir: "" },
     { url: "./data/manifest.json", baseDir: "data" },
   ];
   for(const t of tries){
@@ -2067,14 +2069,33 @@ if(Number.isFinite(ab.cnt) || Number.isFinite(ab.val2) || Number.isFinite(sh.cnt
 }
 
 
+function basenameFromPath(filename){
+  return String(filename || "").split(/[\\/]/).pop() || String(filename || "");
+}
 function yearFromFilename(filename){
-  const s = String(filename || "");
+  const s = basenameFromPath(filename);
   const m = s.match(/^(\d{3})(?=\D)/);
   if(m){
     const roc = Number(m[1]);
     if(roc >= 1 && roc <= 999) return roc + 1911;
   }
   return state.year || 2025;
+}
+function mmddInRange(mmdd, range){
+  if(!range) return true;
+  const n = Number(mmdd);
+  if(!Number.isFinite(n)) return true;
+  return n >= range.start && n <= range.end;
+}
+function dateRangeFromFilename(filename){
+  // 支援：115長家生產日報表(0501-0518).xlsx、114長家生產日報(1001-1031).xlsx
+  const s = basenameFromPath(filename);
+  const m = s.match(/[（(]\s*(\d{4})\s*[-~～至]\s*(\d{4})\s*[)）]/);
+  if(!m) return null;
+  const start = Number(m[1]);
+  const end = Number(m[2]);
+  if(!Number.isFinite(start) || !Number.isFinite(end)) return null;
+  return { start: Math.min(start, end), end: Math.max(start, end) };
 }
 function dateKeyToDateObj(dateKey){
   const m = String(dateKey).match(/^(\d{4})(\d{4})$/);
@@ -2089,26 +2110,40 @@ async function parseWorkbookArrayBuffer(buf, filename){
   const wb = XLSX.read(buf, {type:"array"});
   state.loadedFiles.push(filename);
   const fileYear = yearFromFilename(filename);
+  const allowedRange = dateRangeFromFilename(filename);
+
+  let parsedTotal = 0;
+  let parsedDetail = 0;
 
   for(const sname of wb.SheetNames){
     const totalMatch = String(sname).match(/^\s*(\d{4})\s*總\s*$/);
     if(totalMatch){
-      const dateKey = `${fileYear}${totalMatch[1]}`;
+      const mmdd = totalMatch[1];
+      if(!mmddInRange(mmdd, allowedRange)) continue;
+      const dateKey = `${fileYear}${mmdd}`;
       parseDailySummarySheet(wb, sname, dateKey);
+      parsedTotal++;
       continue;
     }
 
     const mmdd = parseMmdd(sname);
     if(mmdd){
+      if(!mmddInRange(mmdd, allowedRange)) continue;
       // 長家廠的明細分頁名稱為 0501、0502...；等同 4°C 日報明細。
       parseTempSheet(wb, sname, "4",  `${fileYear}${mmdd}`);
+      parsedDetail++;
       continue;
     }
 
     // 相容舊式/其他匯出格式：若分頁名含「長家4度C0501」也能解析。
     const t4  = String(sname).match(/(?:長家)?\s*4度C\s*(\d{4})/);
-    if(t4)  parseTempSheet(wb, sname, "4",  `${fileYear}${t4[1]}`);
+    if(t4){
+      if(!mmddInRange(t4[1], allowedRange)) continue;
+      parseTempSheet(wb, sname, "4",  `${fileYear}${t4[1]}`);
+      parsedDetail++;
     }
+  }
+  console.log("parsed workbook", basenameFromPath(filename), {fileYear, allowedRange, parsedTotal, parsedDetail, summaries: state.summaries.size, records: state.recordList.length});
 }
 
 
