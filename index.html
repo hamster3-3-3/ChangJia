@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" href="data:," />
-  <title>晉欣鮮食廠｜日報儀表板</title>
+  <title>長家鮮食廠｜日報儀表板</title>
   <!-- BUILD v72_new_product_first_seen_plus1 -->
   <link rel="icon" href="data:,">
 
@@ -64,7 +64,7 @@
     <!-- Header -->
     <div class="flex flex-col md:flex-row md:items-end md:justify-between gap-3">
       <div>
-        <div class="text-2xl md:text-3xl font-extrabold text-slate-900">晉欣鮮食廠｜日報儀表板</div>
+        <div class="text-2xl md:text-3xl font-extrabold text-slate-900">長家鮮食廠｜日報儀表板</div>
         <div class="text-slate-600 font-semibold mt-1"></div>
       </div>
       <div class="flex flex-wrap items-center gap-2">
@@ -139,10 +139,9 @@
         <div>
           <div class="label mb-2">溫層</div>
           <div class="flex flex-wrap gap-2" role="group" aria-label="Temp">
-            <button class="seg-btn" data-temp="18">18°C</button>
             <button class="seg-btn active" data-temp="4">4°C</button>
           </div>
-          <div class="hint mt-2">18°C 不顯示產能達成率（依你要求）。</div>
+          <div class="hint mt-2">長家廠資料以 4°C 生產線為主。</div>
         </div>
       </div>
 
@@ -489,7 +488,7 @@
         <div>
           <label class="label block mb-2">線別</label>
           <select id="lineSelect" class="select" disabled></select>
-          <div class="hint mt-2">選擇線別後：顯示人時性達成率平均。4°C 另外顯示產能達成率平均；18°C 不顯示。</div>
+          <div class="hint mt-2">選擇線別後：顯示人時性達成率平均與產能達成率平均。</div>
         </div>
 
         <div class="lg:col-span-2">
@@ -788,13 +787,14 @@ async function ensureLibs(){
    ※ 檔名必須「完全一致」且需包含 .xlsx 副檔名
 ========================= */
 const PRELOAD_FILES = [
-  "114.07.01-31晉欣廠生產日報表.xlsx",
-  "114.08.01-31晉欣廠生產日報表.xlsx",
-  "114.09.01-13晉欣廠生產日報表.xlsx",
-  "114.10.01-27晉欣廠生產日報表.xlsx",
-  "114.11.01-30晉欣廠生產日報表.xlsx",
-  "114.12.01-30晉欣廠生產日報表.xlsx",
-  "115.01.01-05晉欣廠生產日報表.xlsx",
+  "114長家生產日報(1001-1031).xlsx",
+  "114長家生產日報(1101-1130).xlsx",
+  "114長家生產日報(1201-1231).xlsx",
+  "115長家生產日報表(0101-0131).xlsx",
+  "115長家生產日報表(0201-0228).xlsx",
+  "115長家生產日報表(0301-0331).xlsx",
+  "115長家生產日報表(0401-0430).xlsx",
+  "115長家生產日報表(0501-0518).xlsx",
 ];
 
 /* =========================
@@ -963,23 +963,8 @@ const LINE_WHITELIST_4C = [
   "便當組 大口 固定線 (伺服包裝機)",
 ];
 
-// 18°C 線別白名單（依你提供的名單）
-const LINE_WHITELIST_18C = [
-  "壽司線",
-  "捲壽司機",
-  "3300型 飯糰機A",
-  "3300型B 飯糰機",
-  "3600型(A) 飯糰機",
-  "3600型(B) 飯糰機",
-  "二配 夾心型 飯糰機",
-  "二配 3300型A 飯糰機",
-  "二配 3300型B 飯糰機",
-  "二配 3600型A 飯糰機",
-  "二配 3600型B 飯糰機",
-];
-
-function getLineWhitelistByTemp(tempStr){
-  return tempStr === "18" ? LINE_WHITELIST_18C : LINE_WHITELIST_4C;
+function getLineWhitelistByTemp(_tempStr){
+  return LINE_WHITELIST_4C;
 }
 // =========================
 // First-seen / launch date index
@@ -1272,7 +1257,7 @@ function monthNumFromMmdd(mmdd){
    State
 ========================= */
 const BUILD_VERSION = "v77_new_product_launch_fix_launchdays_guard";
-console.log("Jinxin dashboard build: v77_new_product_launch_fix_launchdays_guard");
+console.log("Changjia dashboard build: v77_new_product_launch_fix_launchdays_guard");
 const state = {
   rangeMode: "year",
   temp: "4",
@@ -1561,7 +1546,7 @@ function rebuildAvailableMmdd(){
 // 補齊達成率：
 // 1) 若原始資料沒有達成率欄位，先嘗試用（實際/標準）推算（已在 parse 中處理）
 // 2) 若仍無，則以「同日同溫層同線別」的人時性/產能做相對化（eff 或 cap / 該線別平均）
-//    目的：讓「最低人時/產能達成率（前六）」在 18°C 分頁仍可正常顯示
+//    目的：讓「最低人時/產能達成率（前六）」可正常顯示
 function fillFallbackAchievements(){
   const base = new Map(); // key=temp|mmdd|lineKey -> {effSum, effCnt, capSum, capCnt}
 
@@ -1620,9 +1605,7 @@ function fillFallbackAchievements(){
 function getAllDatesForTemp(temp){
   const out = [];
 
-  // 只取「該溫層」真正有 summary 的日期，避免 18°C/4°C 日期集合混在一起造成：
-  // - 18°C 週別選到但其實那週沒有 18°C 資料（顯示全空）
-  // - 週別下拉無法正常建立（因為過濾後為空）
+  // 只取「該溫層」真正有 summary 的日期，避免不同溫層日期集合混在一起造成週別下拉異常
   //
   // ⚠️ 注意：不要在這裡用「年份字首」過濾（YYYYMMDD startsWith(state.year)），
   // 否則「週二~週一」跨年 / 跨月的週窗口（例如 12/30~01/05）在年別/月別視圖會被截斷，
@@ -1852,7 +1835,7 @@ updateFirstSeenProd(temp, dateKey, prod);
   }
 
   // 4°C：線別達成率平均（人時性/產能）
-  // 來源：晉欣4度C分頁右側區塊
+  // 來源：長家4度C分頁右側區塊
   // - 人時性差異分析：S欄（達成率平均）
   // - 產能差異分析：AD欄（達成率平均）
   if(temp === "4"){
@@ -1868,7 +1851,7 @@ updateFirstSeenProd(temp, dateKey, prod);
 const capAvg = toNumber(row[29]);
 
 // 產線配置圖(標準) vs 生產實績(實際) 的「人時性/產能(每小時)」：用來做期間彙總時的加權達成率
-// 依晉欣4°C 分頁常見配置：
+// 依長家4°C 分頁常見配置：
 // - K 欄(0-based 10)：產能/時(標準)
 // - L 欄(0-based 11)：人時性(標準)
 // - N 欄(0-based 13)：產能/時(實際)
@@ -1986,8 +1969,7 @@ if(Number.isFinite(ab.cnt) || Number.isFinite(ab.val2) || Number.isFinite(sh.cnt
 (function(){
   const mmdd = (dateKey||"").slice(4); // YYYYMMDD -> MMDD
   const tempSheets = [
-    { temp: "4", shName: `晉欣4度C${mmdd}` },
-    { temp: "18", shName: `晉欣18度C${mmdd}` },
+    { temp: "4", shName: `長家4度C${mmdd}` },
   ];
 
   function findCellText(grid, pred, maxR=200, maxC=60){
@@ -2087,8 +2069,6 @@ if(Number.isFinite(ab.cnt) || Number.isFinite(ab.val2) || Number.isFinite(sh.cnt
   }
 
   parseSection("➁4度C-各編組展開", "4", "");
-  parseSection("➂18度C 一配-各編組展開", "18", "");
-  parseSection("➃18度C 二配-各編組展開", "18", "二配 ");
 }
 
 
@@ -2122,9 +2102,7 @@ async function parseWorkbookArrayBuffer(buf, filename){
       parseDailySummarySheet(wb, sname, dateKey);
       continue;
     }
-    const t18 = String(sname).match(/晉欣\s*18度C\s*(\d{4})/);
-    const t4  = String(sname).match(/晉欣\s*4度C\s*(\d{4})/);
-    if(t18) parseTempSheet(wb, sname, "18", `${fileYear}${t18[1]}`);
+    const t4  = String(sname).match(/(?:長家|長家)?\s*4度C\s*(\d{4})/);
     if(t4)  parseTempSheet(wb, sname, "4",  `${fileYear}${t4[1]}`);
     }
 }
@@ -2298,7 +2276,7 @@ setDataChip("warn", "自動載入中…");
     }
   }
 
-  // 補齊達成率（避免 18°C 分頁缺少達成率欄位導致「低達成率品項」空白）
+  // 補齊達成率（補齊達成率資料）
   fillFallbackAchievements();
 
 rebuildAvailableMmdd();
@@ -2538,7 +2516,7 @@ function refreshSelectors(){
     lineSel.disabled = true;
   }
 
-  // 18°C hide cap card
+  // 長家廠保留 4°C 產能達成率卡片
   $("capCard").classList.toggle("hidden", state.temp !== "4");
 }
 
@@ -2747,7 +2725,7 @@ const chg = getChangeoverForDay(state.temp, d.mmdd);
 
 
 function refreshActiveRangeText(){
-  const tempLabel = (state.temp === "18") ? "18°C" : "4°C";
+  const tempLabel = "4°C";
   let title = "", hint = "";
   const dr = getActiveDayRange();
   const mode = state.rangeMode;
@@ -5203,7 +5181,7 @@ function refreshLineSection(){
 
   const mmddSet = getDateSetInSelection();
   const cats = new Map();
-  for(const rec of _iterKpiDetailRecords()){
+  for(const rec of state.records.values()){
     if(rec.temp !== state.temp) continue;
     if(!mmddSet.has(rec.mmdd)) continue;
     if(cleanKey(rec.line) !== lineKey) continue;
@@ -6451,14 +6429,6 @@ function _isSummaryRowProdName(prod){
   return !p || /(平均|合計|小計|總計)/.test(p);
 }
 
-// KPI 排序明細必須以 recordList 為準，才能保留同一天、同品項多次生產的列。
-// state.records 是相容舊版的 Map，key 相同時會覆蓋，不能用於生產量加總/下滑/上升排序。
-function _iterKpiDetailRecords(){
-  return (Array.isArray(state.recordList) && state.recordList.length)
-    ? state.recordList
-    : Array.from(state.records.values());
-}
-
 // mode=drop：回傳下滑數最高的前 6 名（drop = prevAvgQtyDay - curAvgQtyDay, 僅列 drop>0）
 function _metricDropAgg(metric, pairFilter, catFilter){
   // metric: "qty" | "cap" | "eff"
@@ -6530,7 +6500,7 @@ function _metricDropAgg(metric, pairFilter, catFilter){
     if(Number.isFinite(c)){ it.capSum += c; it.capCnt++; }
   }
 
-  for(const rec of _iterKpiDetailRecords()){
+  for(const rec of state.records.values()){
     if(rec.temp !== state.temp) continue;
     if(curSet.has(rec.mmdd))  acc(curMap, rec);
     if(prevSet.has(rec.mmdd)) acc(prevMap, rec);
@@ -6713,7 +6683,7 @@ function _metricRiseAgg(metric, pairFilter, catFilter){
     if(Number.isFinite(c)){ it.capSum += c; it.capCnt++; }
   }
 
-  for(const rec of _iterKpiDetailRecords()){
+  for(const rec of state.records.values()){
     if(rec.temp !== state.temp) continue;
     if(curSet.has(rec.mmdd))  acc(curMap, rec);
     if(prevSet.has(rec.mmdd)) acc(prevMap, rec);
