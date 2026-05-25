@@ -6295,6 +6295,9 @@ function _lowestRateAgg(mode, pairFilter, catFilter){
     const prodKey = cleanKey(rec.product);
 
     if(!lineKey || !catKey || !prodKey) continue;
+    // KPI 排序排除彙總列，避免「平均」列被當成一般品項顯示
+    if(_isSummaryRowProdName(rec.product)) continue;
+    if(catKey === "0") continue;
 // 配別篩選：以品名前二字是否為「二配」判定
 if(pairFilter === "two"){
   if(!isTwoPei(rec.product)) continue;
