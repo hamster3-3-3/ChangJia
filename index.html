@@ -898,6 +898,67 @@ async function listXlsxFilesFromManifest(){
   return [];
 }
 
+/* =========================
+   預先轉換 JSON（加速載入）
+   - GitHub Actions 會依 data/json-manifest.json 對應 Excel 與 JSON
+   - JSON 無法取得或版本不符時，仍會自動回退到原本的 Excel 解析
+========================= */
+let jsonManifestIndex = {files:{}};
+const jsonPayloadCache = new Map();
+const JSON_MAP_KEYS = [
+  "summaries", "records", "itemCountDaily", "lineHumanDaily",
+  "lineAvgFromSheets", "stoplineDaily", "changeoverDaily", "changeoverCountDaily"
+];
+
+async function loadJsonManifestIndex(){
+  try{
+    const res = await fetch("./data/json-manifest.json", {cache:"no-store"});
+    if(!res.ok) throw new Error("HTTP " + res.status);
+    const mf = await res.json();
+    jsonManifestIndex = (mf && mf.files && typeof mf.files === "object") ? mf : {files:{}};
+  }catch(e){
+    jsonManifestIndex = {files:{}};
+    console.warn("JSON manifest unavailable; will use Excel:", e);
+  }
+}
+
+function mergeDashboardJson(payload, filename){
+  if(!payload || !Array.isArray(payload.recordList)) throw new Error("invalid dashboard JSON: recordList");
+  for(const key of JSON_MAP_KEYS){
+    if(!Array.isArray(payload[key])) throw new Error("invalid dashboard JSON: " + key);
+  }
+  for(const key of JSON_MAP_KEYS){
+    for(const pair of payload[key]){
+      if(Array.isArray(pair) && pair.length >= 2) state[key].set(pair[0], pair[1]);
+    }
+  }
+  state.recordList.push(...payload.recordList);
+  state.loadedFiles.push(filename);
+}
+
+async function loadDashboardJson(filename){
+  const entry = jsonManifestIndex.files && jsonManifestIndex.files[filename];
+  if(!entry || !entry.json) return false;
+  try{
+    let payload = jsonPayloadCache.get(entry.json);
+    if(!payload){
+      const encoded = String(entry.json).split("/").map(encodeURIComponent).join("/");
+      const version = encodeURIComponent(entry.sourceSha256 || entry.parserHash || "");
+      const res = await fetch("./" + encoded + (version ? "?v=" + version : ""), {cache:"force-cache"});
+      if(!res.ok) throw new Error("HTTP " + res.status + " @ " + entry.json);
+      payload = await res.json();
+      jsonPayloadCache.set(entry.json, payload);
+    }
+    if(entry.sourceSha256 && payload.sourceSha256 !== entry.sourceSha256) throw new Error("source hash mismatch");
+    if(entry.parserHash && payload.parserHash !== entry.parserHash) throw new Error("parser version mismatch");
+    mergeDashboardJson(payload, filename);
+    return true;
+  }catch(e){
+    console.warn("JSON preload failed; fallback to Excel:", filename, e);
+    return false;
+  }
+}
+
 async function listXlsxFilesFromGitHub(){
   if(!GITHUB_AUTOLOAD) return [];
 
@@ -2397,6 +2458,8 @@ async function loadPreloadItem(it, generation){
   if(state.loadedFiles.includes(it.name)) return {ok:true, skipped:true};
 
   try{
+    if(await loadDashboardJson(it.name)) return {ok:true, json:true};
+
     let buf;
     try{
       buf = await fetchArrayBufferSmart(it.url || it.name);
@@ -2491,6 +2554,9 @@ async function preload(){
   setDataChip("warn", "正在取得資料清單…", {loading:true, progress:3});
   let fileItems = [];
   let sourceLabel = "預設清單";
+
+  // JSON 索引與 Excel 清單分開載入；即使索引不存在也不影響原本流程。
+  await loadJsonManifestIndex();
 
   // 0) 優先：manifest.json（最穩）
   try{
